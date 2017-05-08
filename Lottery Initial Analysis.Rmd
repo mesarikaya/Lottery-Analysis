@@ -1,0 +1,167 @@
+---
+title: "Lottery Data Analysis"
+author: "Ergin Sarikaya"
+date: "July 15, 2016"
+output: html_document
+---
+
+# GOAL
+
+This study aims to understand the patterns in the lotttery results. For that purpose data can be automatically downloaded and manipulated to understand the underlying patterns- if exists.
+
+# DATA RETRIEVAL
+
+Data can be retrieved via following code:
+
+```{r, echo=FALSE,cache=TRUE}
+  #fileName <- readline("What is the file name?")
+  #fileName <- as.numeric(unlist(strsplit(filename,",")))
+  setwd("~/GitHub/Lottery Analysis/LotteryAnalysis")
+  data <- read.csv(file = "C:/Users/sarikaya.me/Documents/GitHub/Lottery Analysis/LotteryAnalysis/Lotterydata.csv",sep = ";")
+```
+
+
+# DATA ANALYSIS
+Let's have a look at the data briefly.
+
+```{r, echo=FALSE}
+ library(dplyr)
+ library(tidyr)
+ library(ggplot2)
+ library(grid)
+ library(lubridate)
+ library(manipulate)
+#str(data)
+#summary(data)
+#View(data)
+```
+
+Data reveals that in a single day there may be more than one lottery draw. And the data is already in sorted form. There exists 6 key numbers and they are reported in sorted form  between columns.
+
+Additionally there is also a data field named as reserve and for the prupose of this study, only first six letters and the color codes are our key interest area. Therefore the reserve field will be removed from the data set.
+
+```{r, echo=FALSE,cache=TRUE}
+ data <- data[,-which(colnames(data) == "Reserve")]
+ x <- dmy(data$Datum)
+ data$Year <- year(x)
+ recentData <- data[-which(data[,"Kleur"] == ""),]
+ # data <- recentData
+ # data<-data[-which(data[,"Year"]==2000),]
+```
+
+## Hypothesis:
+There may be patterns occuring. Hence occurence of a number in previous draws may effect the next draw.
+
+Let's first combine the numbers and create a single integer number and also see the totals.
+
+```{r,echo=FALSE,cache=TRUE}
+  data$draw = paste(data$Eerste,data$Tweede,data$Derde,data$Vierde,data$Vijfde,data$Zesde,sep="")
+  data$drawTotal <- data$Eerste+data$Tweede+data$Derde+data$Vierde+data$Vijfde+data$Zesde
+  data$gapBetween1 <-abs(data$Tweede-data$Eerste)
+  data$gapBetween2 <-abs(data$Derde-data$Tweede)
+  data$gapBetween3 <- abs(data$Vierde-data$Derde)
+  data$gapBetween4 <- abs(data$Vijfde-data$Vierde)
+  data$gapBetween5 <- abs(data$Zesde-data$Vijfde)
+  data$meanGap <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,mean)
+  data$std <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,sd)
+  numbers<-as.data.frame(c(data$Eerste,data$Tweede,data$Derde,data$Vierde,data$Vijfde,data$Zesde))
+  colnames(numbers)<-"drawNumbers"
+```
+
+
+Let's first examine the occurence of individual numbers.
+```{r,cache=TRUE,echo=FALSE}
+  num_plot1 <- ggplot(numbers, aes(x = drawNumbers)) +
+                geom_histogram(aes(y =..density..,),binwidth = 1,colour = "dark green", fill = "light blue") +                 geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(numbers$drawNumbers)),linetype ="dashed",colour = "red", size = 2) +
+                ggtitle("Totals of numbers in the Draw") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(numbers$drawNumbers),by=1))
+
+  
+ num_plot2 <- ggplot(numbers, aes(x=drawNumbers)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(numbers$drawNumbers),by=1))+
+          scale_y_continuous(breaks=seq(0,1,by=1))+
+          geom_vline(aes(xintercept=mean(numbers$drawNumbers)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(num_plot1), ggplotGrob(num_plot2), size = "last"))
+         
+```
+
+
+Histogram of the total and the numbers may be interesting. Theoretically the min of the totals of the draw is 21 (combination of 1,2,3,4,5,6) and the maximum of the combination is 255 (40+41+42+43+44+45) and mean of these two boundaries is 138. In a fair game one expects to see the average to be close to this number. 
+
+The means and quantiles of the draw totals are as such;
+```{r,echo=FALSE}
+ summary(data$drawTotal)
+ Fn <- ecdf(data$drawTotal)
+ print(paste0("Probability of less than 170: ",round(Fn(170),2)))
+
+```
+
+First the observed min is 41 and observed max is 237. That indicates that there may be a tendency of not seeing low numbers drawn together and also too high numbers seem to have not been drawn together. On the other hand 92% of the observations ended up with a sum less than 170. ~77% of the observations are between the total of 100 and 170 and ~50% is between the total of 120 and 170. If the history repeats itself, it could be considered that the chance of winning the Lottery is a bit higher than thought. 
+
+```{r,cache=TRUE,echo=FALSE}
+  plot1 <- ggplot(data, aes(x=drawTotal)) +
+                geom_histogram(aes(y =..density..,),binwidth = 7,colour = "dark green", fill = "light blue") +                 geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(data$drawTotal)),linetype ="dashed",colour = "red", size = 2) +
+                ggtitle("Totals of numbers in the Draw") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(data$drawTotal),by=7))
+
+  
+  plot2 <- ggplot(data, aes(x=drawTotal)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(data$drawTotal),by=7))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(data$drawTotal)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot1), ggplotGrob(plot2), size = "last"))
+         
+```
+
+
+
+Let's create new columns that can record the past draws.
+
+```{r, echo=FALSE, cache=TRUE}
+ plot3 <- ggplot(data, aes(x=meanGap)) +
+                geom_histogram(aes(y =..density..,),binwidth = 0.4,colour = "dark green", fill = "light blue")+
+                geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(data$meanGap)),linetype ="dashed",colour = "red", size = 2) +
+                ggtitle("Mean difference between numbers") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(data$meanGap),by=0.4))
+
+  
+  plot4 <- ggplot(data, aes(x=meanGap)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(data$meanGap),by=0.4))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(data$meanGap)),linetype ="dashed",colour = "red", size = 2)+
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot3), ggplotGrob(plot4), size = "last"))
+```
+
+
+
+Std
+```{r, echo=FALSE, cache=TRUE}
+ plot6 <- ggplot(data, aes(x=std)) +
+                geom_histogram(aes(y =..density..,),binwidth = 0.5,colour = "dark green", fill = "light blue")+
+                geom_density(alpha = .1,size = 1) + 
+                ggtitle("Std between numbers") + 
+                geom_vline(aes(xintercept=mean(data$std)),linetype ="dashed",colour = "red", size = 2) +
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(data$std),by=0.5))
+
+  
+  plot7 <- ggplot(data, aes(x=std)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(data$std),by=0.5))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(data$std)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot6), ggplotGrob(plot7), size = "last"))
+```

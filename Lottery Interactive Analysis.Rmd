@@ -1,0 +1,495 @@
+---
+title: "Iteractive Lottery Analysis"
+author: "Ergin Sarikaya"
+date: "July 18, 2016"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+ 
+ library(dplyr)
+ library(tidyr)
+ library(ggplot2)
+ library(grid)
+ library(lubridate)
+ library(manipulate)
+```
+
+# GOAL
+
+This study aims to understand the patterns in the lotttery results. For that purpose data can be automatically downloaded and manipulated to understand the underlying patterns- if exists.
+
+# DATA RETRIEVAL
+
+Data can be retrieved via following code:
+
+```{r, echo=FALSE,cache=TRUE}
+  #fileName <- readline("What is the file name?")
+  #fileName <- as.numeric(unlist(strsplit(filename,",")))
+  setwd("~/GitHub/Lottery Analysis/LotteryAnalysis")
+  data <- read.csv(file = "C:/Users/sarikaya.me/Documents/GitHub/Lottery Analysis/LotteryAnalysis/Lotterydata.csv",sep = ";")
+```
+
+
+# DATA ANALYSIS
+Let's have a look at the data briefly.
+
+```{r, echo=FALSE}
+
+#str(data)
+#summary(data)
+#View(data)
+```
+
+Data reveals that in a single day there may be more than one lottery draw. And the data is already in sorted form. There exists 6 key numbers and they are reported in sorted form  between columns.
+
+Additionally there is also a data field named as reserve and for the prupose of this study, only first six letters and the color codes are our key interest area. Therefore the reserve field will be removed from the data set.
+
+```{r, echo=FALSE}
+ data <- data[,-which(colnames(data) == "Reserve")]
+data<-as.data.frame(data,stringsAsFactors=FALSE)
+
+```
+
+## Hypothesis:
+There may be patterns occuring. Hence occurence of a number in previous draws may effect the next draw.
+
+Let's first combine the numbers and create a single integer number and also see the totals.
+
+```{r,echo=FALSE}
+  source('~/GitHub/Lottery Analysis/LotteryAnalysis/CoupleCombinationsSearch.R')
+
+  x <- dmy(data$Datum)
+  data$Year <- as.numeric(year(x))
+  data$draw <- paste(data$Eerste,data$Tweede,data$Derde,data$Vierde,data$Vijfde,data$Zesde,sep="")
+  data$drawTotal <- data$Eerste+data$Tweede+data$Derde+data$Vierde+data$Vijfde+data$Zesde
+  data$gapBetween1 <-abs(data$Tweede-data$Eerste)
+  data$gapBetween2 <-abs(data$Derde-data$Tweede)
+  data$gapBetween3 <- abs(data$Vierde-data$Derde)
+  data$gapBetween4 <- abs(data$Vijfde-data$Vierde)
+  data$gapBetween5 <- abs(data$Zesde-data$Vijfde)
+  data$meanGap <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,mean)
+  data$minGap <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,min)
+  data$maxGap <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,max)
+  data$std <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,sd)
+  
+  numbers<-as.data.frame(c(data$Eerste,data$Tweede,data$Derde,data$Vierde,data$Vijfde,data$Zesde))
+  colnames(numbers)<-"drawNumbers"
+  oneGapRepeat <-matchCombinations(data,diff=1,startLoc=2)
+  data$oneGapFirst <- -1
+  data$oneGapTwo <- -1
+  for (i in 1:nrow(oneGapRepeat)){
+        if(!is.na(oneGapRepeat[i,"results"])){
+                data[oneGapRepeat[i,"locations"],"oneGapFirst"]<-oneGapRepeat[i,"results"] 
+        }
+        
+         
+  }
+  for (i in 1:nrow(oneGapRepeat)){
+          if(!is.na(oneGapRepeat[i,"results"])){
+                  if( data[oneGapRepeat[i,"locations"],"oneGapFirst"]!=oneGapRepeat[i,"results"]){
+                          data[oneGapRepeat[i,"locations"],"oneGapTwo"]<-oneGapRepeat[i,"results"] 
+                  }
+          }
+  }
+  
+  twoGapRepeat <- matchCombinations(data,diff=2,startLoc=2)
+  data$twoGapFirst <- -1
+  data$twoGapTwo <- -1
+  for (i in 1:nrow(twoGapRepeat)){
+         if(!is.na(twoGapRepeat[i,"results"])){
+                data[twoGapRepeat[i,"locations"],"twoGapFirst"]<-twoGapRepeat[i,"results"]
+         }
+         
+  }
+  for (i in 1:nrow(twoGapRepeat)){
+          if(!is.na(twoGapRepeat[i,"results"])){
+                  if( data[twoGapRepeat[i,"locations"],"twoGapFirst"]!=twoGapRepeat[i,"results"]){
+                          data[twoGapRepeat[i,"locations"],"twoGapTwo"]<-twoGapRepeat[i,"results"] 
+                  }
+          }
+  }
+  
+  threeGapRepeat <- matchCombinations(data,diff=3,startLoc=2)
+  data$threeGapFirst <- -1
+  data$threeGapTwo <- -1
+  for (i in 1:nrow(threeGapRepeat)){
+         if(!is.na(threeGapRepeat[i,"results"])){
+                data[threeGapRepeat[i,"locations"],"threeGapFirst"]<-threeGapRepeat[i,"results"]
+         }
+         
+  }
+  for (i in 1:nrow(threeGapRepeat)){
+          if(!is.na(threeGapRepeat[i,"results"])){
+                  if( data[threeGapRepeat[i,"locations"],"threeGapFirst"]!=threeGapRepeat[i,"results"]){
+                          data[threeGapRepeat[i,"locations"],"threeGapTwo"]<-threeGapRepeat[i,"results"] 
+                  }
+          }
+  }
+
+```
+
+## Hypothesis:
+There may be patterns occuring. Hence occurence of a number in previous draws may effect the next draw.
+
+Let's first combine the numbers and create a single integer number and also see the totals.
+
+```{r,echo=FALSE}
+  data$draw = paste(data$Eerste,data$Tweede,data$Derde,data$Vierde,data$Vijfde,data$Zesde,sep="")
+  data$draw<-as.numeric(data$draw)
+  data$draw<-data$draw/1000000
+  data$drawTotal <- data$Eerste+data$Tweede+data$Derde+data$Vierde+data$Vijfde+data$Zesde
+  data$gapBetween1 <-abs(data$Tweede-data$Eerste)
+  data$gapBetween2 <-abs(data$Derde-data$Tweede)
+  data$gapBetween3 <- abs(data$Vierde-data$Derde)
+  data$gapBetween4 <- abs(data$Vijfde-data$Vierde)
+  data$gapBetween5 <- abs(data$Zesde-data$Vijfde)
+  data$meanGap <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,mean)
+  data$std <- apply(data[,c("gapBetween1","gapBetween2","gapBetween3","gapBetween4","gapBetween5")],1,sd)
+
+```
+
+## Individual Number Distributions
+Let's first examine the occurence of individual numbers.
+```{r,echo=FALSE}
+numericInput("YearMin", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMax", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+  tempdata<-data[which(data[,"Year"]>=input$YearMin & data[,"Year"]<=input$YearMax),]
+  numbers<-as.data.frame(c(tempdata$Eerste,tempdata$Tweede,tempdata$Derde,tempdata$Vierde,tempdata$Vijfde,tempdata$Zesde))
+  colnames(numbers)<-"drawNumbers"
+  num_plot1 <- ggplot(numbers, aes(x = drawNumbers)) +
+                geom_histogram(aes(y =..density..,),binwidth = 1,colour = "dark green", fill = "light blue") +                 geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(numbers$drawNumbers)),linetype ="dashed",colour = "red", size = 2) +
+                ggtitle("Dist. of Numbers in the Draw") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(numbers$drawNumbers),by=1))
+
+  
+ num_plot2 <- ggplot(numbers, aes(x=drawNumbers)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(numbers$drawNumbers),by=1))+
+          scale_y_continuous(breaks=seq(0,1,by=1))+
+          geom_vline(aes(xintercept=mean(numbers$drawNumbers)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(num_plot1), ggplotGrob(num_plot2), size = "last"))
+})
+         
+```
+Depending on the year period, there are biases on certain numbers. At the beginning periods the biggest numbers such as 43,454 and 45 rarely occurs and later that reverse. With the sample size effect later the distributions seems to stabilize and get closer. However there are still numbers that occur significantly huigher than the rest after such a long period.
+
+
+## Distribution of Draw Total
+
+Histogram of the total and the numbers may be interesting. Theoretically the min of the totals of the draw is 21 (combination of 1,2,3,4,5,6) and the maximum of the combination is 255 (40+41+42+43+44+45) and mean of these two boundaries is 138. In a fair game one expects to see the average to be close to this number. 
+
+First the observed min is 41 and observed max is 237. That indicates that there may be a tendency of not seeing low numbers drawn together and also too high numbers seem to have not been drawn together. On the other hand 92% of the observations ended up with a sum less than 170. ~77% of the observations are between the total of 100 and 170 and ~50% is between the total of 120 and 170. If the history repeats itself, it could be considered that the chance of winning the Lottery is a bit higher than thought. 
+
+```{r,echo=FALSE}
+numericInput("YearMins", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMaxs", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+  tempdata<-data[which(data[,"Year"]>=input$YearMins & data[,"Year"]<=input$YearMaxs),]# Fn <- ecdf(tempdata$drawTotal)
+ # print(paste0("Probability of less than 170: ",round(Fn(170),2)))
+ # print("The means and quantiles of the draw totals are as such: ", mean(tempdata$drawTotal,is.na=TRUE))
+        
+ plot1 <- ggplot(tempdata, aes(x=drawTotal)) +
+                geom_histogram(aes(y =..density..,),binwidth = 7,colour = "dark green", fill = "light blue") +                 geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(tempdata$drawTotal)),linetype ="dashed",colour = "red", size = 2) +
+                ggtitle("Dist. of Totals of numbers in the Draw") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(tempdata$drawTotal),by=7))
+
+  
+  plot2 <- ggplot(tempdata, aes(x=drawTotal)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(tempdata$drawTotal),by=7))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(tempdata$drawTotal)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot1), ggplotGrob(plot2), size = "last"))
+})
+         
+```
+
+## Distribution of grouped draw number value
+
+Let's examine the grouped number values and where they range.
+
+```{r,echo=FALSE}
+numericInput("YearMin_12", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMax_12", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+  tempdata<-data[which(data[,"Year"]>=input$YearMin_12 & data[,"Year"]<=input$YearMax_12),]
+        
+ plots1 <- ggplot(tempdata, aes(x=draw)) +
+                geom_histogram(aes(y =..density..,),binwidth=5000,colour = "dark green", fill = "light blue") +                 geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(tempdata$draw)),linetype ="dashed",colour = "red", size = 2) +  ggtitle("Dist. of Draw number group") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))
+              
+
+  
+  plots2 <- ggplot(tempdata, aes(x=draw)) + stat_ecdf()+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(tempdata$draw)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plots1), ggplotGrob(plots2), size = "last"))
+})
+         
+```
+
+## Distribution of mean min and max gaps between draw numbers
+
+The distribution of mean gap between numbers is as follows:
+
+```{r, echo=FALSE}
+numericInput("YearMin3", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMax3", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+ tempdata<-data[which(data[,"Year"]>=input$YearMin3 & data[,"Year"]<=input$YearMax3),]
+ plot3 <- ggplot(tempdata, aes(x=meanGap)) +
+                geom_histogram(aes(y =..density..,),binwidth = 0.4,colour = "dark green", fill = "light blue")+
+                geom_density(alpha = .1,size = 1) + 
+                geom_vline(aes(xintercept=mean(tempdata$meanGap)),linetype ="dashed",colour = "red", size = 2) +
+                ggtitle("Mean difference between numbers") + 
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(tempdata$meanGap),by=0.4))
+
+  
+  plot4 <- ggplot(tempdata, aes(x=meanGap)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(tempdata$meanGap),by=0.4))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(tempdata$meanGap)),linetype ="dashed",colour = "red", size = 2)+
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot3), ggplotGrob(plot4), size = "last"))
+})
+```
+
+The distribution of standard deviation of draw number gaps is as follows:
+```{r, echo=FALSE}
+numericInput("YearMin4", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMax4", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+ tempdata<-data[which(data[,"Year"]>=input$YearMin4 & data[,"Year"]<=input$YearMax4),]
+ plot6 <- ggplot(tempdata, aes(x=std)) +
+                geom_histogram(aes(y =..density..,),binwidth = 0.5,colour = "dark green", fill = "light blue")+
+                geom_density(alpha = .1,size = 1) + 
+                ggtitle("Std within number gaps") + 
+                geom_vline(aes(xintercept=mean(tempdata$std)),linetype ="dashed",colour = "red", size = 2) +
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(tempdata$std),by=0.5))
+
+  
+  plot7 <- ggplot(tempdata, aes(x=std)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(tempdata$std),by=0.5))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(tempdata$std)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot6), ggplotGrob(plot7), size = "last"))
+})
+```
+
+The distribution of minimum of draw number gaps is as follows:
+```{r, echo=FALSE}
+numericInput("YearMin5", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMax5", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+ tempdata<-data[which(data[,"Year"]>=input$YearMin5 & data[,"Year"]<=input$YearMax5),]
+ plot8 <- ggplot(tempdata, aes(x=minGap)) +
+                geom_histogram(aes(y =..density..,),binwidth = 1,colour = "dark green", fill = "light blue")+
+                geom_density(alpha = .1,size = 1) + 
+                ggtitle("Min Gap between numbers") + 
+                geom_vline(aes(xintercept=mean(tempdata$minGap)),linetype ="dashed",colour = "red", size = 2) +
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(tempdata$minGap),by=1))
+
+  
+  plot9 <- ggplot(tempdata, aes(x=minGap)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(tempdata$minGap),by=1))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(tempdata$minGap)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot8), ggplotGrob(plot9), size = "last"))
+})
+```
+
+The distribution of maximum of draw number gaps is as follows:
+```{r, echo=FALSE}
+numericInput("YearMin6", "Year Range min:", min =1974 , max = 2016, value = 1974,step=1)
+
+numericInput("YearMax6", "Year Range max:", min =1974 , max = 2016, value = 2016,step=1)
+
+renderPlot({
+ tempdata<-data[which(data[,"Year"]>=input$YearMin6 & data[,"Year"]<=input$YearMax6),]
+ plot10 <- ggplot(tempdata, aes(x=maxGap)) +
+                geom_histogram(aes(y =..density..,),binwidth = 1,colour = "dark green", fill = "light blue")+
+                geom_density(alpha = .1,size = 1) + 
+                ggtitle("Max gap between numbers") + 
+                geom_vline(aes(xintercept=mean(tempdata$maxGap)),linetype ="dashed",colour = "red", size = 2) +
+                theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))+
+                scale_x_continuous(breaks=seq(0,max(tempdata$maxGap),by=1))
+
+  
+  plot11 <- ggplot(tempdata, aes(x=maxGap)) + stat_ecdf()+
+          scale_x_continuous(breaks=seq(0,max(tempdata$maxGap),by=1))+
+          scale_y_continuous(breaks=seq(0,1,by=0.1))+
+          geom_vline(aes(xintercept=mean(tempdata$maxGap)),linetype ="dashed",colour = "red", size = 2) +
+          theme(axis.text=element_text(size=8),axis.title = element_text(size=8))
+  grid.newpage()
+  grid.draw(rbind(ggplotGrob(plot10), ggplotGrob(plot11), size = "last"))
+})
+```
+
+## Examination of repeats
+
+One difference repeats:
+```{r, echo=FALSE}
+
+numericInput("minTotal", "Total min:", min =21 , max = 250, value = 0,step=10)
+
+numericInput("maxTotal", "Year Range max:", min =21 , max = 250, value = 250,step=10)
+
+renderPlot({
+ tempdata <- data[which(data[,"drawTotal"]>=input$minTotal & data[,"drawTotal"]<=input$maxTotal),]
+ oneGapRepeat <- as.data.frame(matchCombinations(tempdata,1,2))
+ #colnames(oneGapRepeat) <-c("result","locations")
+ graphdata<-as.data.frame(sort(table(oneGapRepeat$results),decreasing=TRUE))
+ ggplot(graphdata,aes(x=graphdata[,1]))+geom_count(aes(y=graphdata$Freq))+
+         ggtitle("One Repeat Frequencies")+ylab("Freq")+xlab("Couple")+
+         theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))
+        
+})
+
+```
+
+Two difference repeats:
+```{r, echo=FALSE}
+
+numericInput("minTotal1", "Total min:", min =21 , max = 250, value = 0,step=10)
+
+numericInput("maxTotal1", "Year Range max:", min =21 , max = 250, value = 250,step=10)
+
+renderPlot({
+ tempdata <- data[which(data[,"drawTotal"]>=input$minTotal1 & data[,"drawTotal"]<=input$maxTotal1),]
+ 
+ twoGapRepeat <- as.data.frame(matchCombinations(tempdata,2,2))
+ #colnames(oneGapRepeat) <-c("result","location")
+ graphdata2<-as.data.frame(sort(table(twoGapRepeat$results),decreasing=TRUE))
+ ggplot(graphdata2,aes(x=graphdata2[,1]))+geom_count(aes(y=graphdata2$Freq))+
+         ggtitle("Two Repeat Frequencies")+ylab("Freq")+xlab("Couple")+
+         theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))
+ 
+     
+})
+
+```
+
+Three difference repeats:
+```{r, echo=FALSE}
+
+numericInput("minTotal2", "Total min:", min =21 , max = 250, value = 0,step=10)
+
+numericInput("maxTotal2", "Year Range max:", min =21 , max = 250, value = 250,step=10)
+
+renderPlot({
+ tempdata <- data[which(data[,"drawTotal"]>=input$minTotal2 & data[,"drawTotal"]<=input$maxTotal2),]
+ 
+ threeGapRepeat <- as.data.frame(matchCombinations(tempdata,3,2))
+ #colnames(oneGapRepeat) <-c("result","location")
+ graphdata3<-as.data.frame(sort(table(threeGapRepeat$results),decreasing=TRUE))
+ ggplot(graphdata3,aes(x=graphdata3[,1]))+geom_count(aes(y=graphdata3$Freq))+
+         ggtitle("three Repeat Frequencies")+ylab("Freq")+xlab("Couple")+
+         theme(plot.title=element_text(size=22,face="bold"),axis.text=element_text(size=8),axis.title = element_text(size=8))
+ 
+        
+})
+
+```
+
+
+```{r, echo=FALSE}
+ tempdata1 <- data[which(data[,"Year"]>=1974 & data[,"Year"]<1985),]
+ tempdata2 <- data[which(data[,"Year"]>=1985 & data[,"Year"]<1995),]
+ tempdata3 <- data[which(data[,"Year"]>=1995 & data[,"Year"]<2005),]
+ tempdata4 <- data[which(data[,"Year"]>=2005 & data[,"Year"]<=2016),]
+ 
+ OneGapRepeat1 <- as.data.frame(matchCombinations(tempdata1,1,2))
+ OneGapRepeat2 <- as.data.frame(matchCombinations(tempdata2,1,2))
+ OneGapRepeat3 <- as.data.frame(matchCombinations(tempdata3,1,2))
+ OneGapRepeat4 <- as.data.frame(matchCombinations(tempdata4,1,2))
+
+ graphdata1<-as.data.frame(sort(table(OneGapRepeat1$results),decreasing=TRUE))
+ graphdata2<-as.data.frame(sort(table(OneGapRepeat2$results),decreasing=TRUE))
+ graphdata3<-as.data.frame(sort(table(OneGapRepeat3$results),decreasing=TRUE))
+ graphdata4<-as.data.frame(sort(table(OneGapRepeat4$results),decreasing=TRUE))
+ colnames(graphdata1) <-c("result","freq")
+ colnames(graphdata2) <-colnames(graphdata1)
+ colnames(graphdata3) <-colnames(graphdata1)
+ colnames(graphdata4) <-colnames(graphdata1)
+ finalgraphdata<-right_join(graphdata1,graphdata2,by="result")
+ finalgraphdata<-right_join(finalgraphdata,graphdata3,by="result")
+ finalgraphdata<-right_join(finalgraphdata,graphdata4,by="result")
+ colnames(finalgraphdata)<-c("result","freq_until_1985","freq_until_1995","freq_until_2005","freq_until_2016")
+ finalgraphdata$mean<-apply(finalgraphdata[,2:5],1,function(x) {mean(x,na.rm=TRUE)})
+ finalgraphdata$std<-apply(finalgraphdata[,2:5],1,function(x) {round(sd(x,na.rm=TRUE),2)})
+
+ 
+ TwoGapRepeat1 <- as.data.frame(matchCombinations(tempdata1,2))
+ TwoGapRepeat2 <- as.data.frame(matchCombinations(tempdata2,2))
+ TwoGapRepeat3 <- as.data.frame(matchCombinations(tempdata3,2))
+ TwoGapRepeat4 <- as.data.frame(matchCombinations(tempdata4,2))
+
+ graphdata1<-as.data.frame(sort(table(TwoGapRepeat1$results),decreasing=TRUE))
+ graphdata2<-as.data.frame(sort(table(TwoGapRepeat2$results),decreasing=TRUE))
+ graphdata3<-as.data.frame(sort(table(TwoGapRepeat3$results),decreasing=TRUE))
+ graphdata4<-as.data.frame(sort(table(TwoGapRepeat4$results),decreasing=TRUE))
+ colnames(graphdata1) <-c("result","freq")
+ colnames(graphdata2) <-colnames(graphdata1)
+ colnames(graphdata3) <-colnames(graphdata1)
+ colnames(graphdata4) <-colnames(graphdata1)
+ finalgraphdata2<-right_join(graphdata1,graphdata2,by="result")
+ finalgraphdata2<-right_join(finalgraphdata2,graphdata3,by="result")
+ finalgraphdata2<-right_join(finalgraphdata2,graphdata4,by="result")
+ colnames(finalgraphdata2)<-c("result","freq_until_1985","freq_until_1995","freq_until_2005","freq_until_2016")
+ finalgraphdata2$mean<-apply(finalgraphdata2[,2:5],1,function(x) {mean(x,na.rm=TRUE)})
+ finalgraphdata2$std<-apply(finalgraphdata2[,2:5],1,function(x) {round(sd(x,na.rm=TRUE),2)})
+
+ ThreeGapRepeat1 <- as.data.frame(matchCombinations(tempdata1,3,2))
+ ThreeGapRepeat2 <- as.data.frame(matchCombinations(tempdata2,3,2))
+ ThreeGapRepeat3 <- as.data.frame(matchCombinations(tempdata3,3,2))
+ ThreeGapRepeat4 <- as.data.frame(matchCombinations(tempdata4,3,2))
+
+ graphdata1<-as.data.frame(sort(table(ThreeGapRepeat1$results),decreasing=TRUE))
+ graphdata2<-as.data.frame(sort(table(ThreeGapRepeat2$results),decreasing=TRUE))
+ graphdata3<-as.data.frame(sort(table(ThreeGapRepeat3$results),decreasing=TRUE))
+ graphdata4<-as.data.frame(sort(table(ThreeGapRepeat4$results),decreasing=TRUE))
+ colnames(graphdata1) <-c("result","freq")
+ colnames(graphdata2) <-colnames(graphdata1)
+ colnames(graphdata3) <-colnames(graphdata1)
+ colnames(graphdata4) <-colnames(graphdata1)
+ finalgraphdata3<-right_join(graphdata1,graphdata2,by="result")
+ finalgraphdata3<-right_join(finalgraphdata3,graphdata3,by="result")
+ finalgraphdata3<-right_join(finalgraphdata3,graphdata4,by="result")
+ colnames(finalgraphdata3)<-c("result","freq_until_1985","freq_until_1995","freq_until_2005","freq_until_2016")
+ finalgraphdata3$mean<-apply(finalgraphdata3[,2:5],1,function(x) {mean(x,na.rm=TRUE)})
+ finalgraphdata3$std<-apply(finalgraphdata3[,2:5],1,function(x) {round(sd(x,na.rm=TRUE),2)})
+
+ ```
