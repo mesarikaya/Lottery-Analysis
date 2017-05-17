@@ -53,5 +53,5 @@ filterDraw <- function(data,prefNum,minTotal,maxTotal,minGapmin,minGapmax,maxGap
         #subset(data,data$minGap<=minGapthreshold && data$maxGap<=maxGapthreshold && data$meanGap<=meanGap && data$drawTotal>=minTotal && data$drawTotal<=maxTotal  )
         
         return(data)
-}
+} 
 
